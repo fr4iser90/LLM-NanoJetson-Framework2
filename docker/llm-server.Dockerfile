@@ -1,11 +1,10 @@
-# LLM Server für Jetson Nano
+# Use the official L4T ML container
 FROM nvcr.io/nvidia/l4t-ml:r35.2.1-py3
 
 WORKDIR /app
 
-# System dependencies
+# System dependencies (only add what's not in base image)
 RUN apt-get update && apt-get install -y \
-    python3-pip \
     libopenblas-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -13,9 +12,9 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Optimierungen für Jetson
-RUN echo "export OPENBLAS_NUM_THREADS=4" >> ~/.bashrc
-RUN echo "export CUDA_LAUNCH_BLOCKING=1" >> ~/.bashrc
+# Jetson optimizations
+ENV OPENBLAS_NUM_THREADS=4
+ENV CUDA_LAUNCH_BLOCKING=1
 
 # Copy source code
 COPY src /app/src

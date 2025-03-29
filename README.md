@@ -336,8 +336,8 @@ The system includes templates and knowledge for common frameworks:
 ### Jetson Nano Setup
 ```bash
 # 1. Clone repository
-git clone https://github.com/fr4iser90/LLM-NanoJetson-Framework
-cd LLM-NanoJetson-Framework
+git clone https://github.com/fr4iser90/LLM-NanoJetson-Framework2
+cd LLM-NanoJetson-Framework2
 
 # 2. Install dependencies
 pip install -r requirements.txt
@@ -355,8 +355,8 @@ python llm_server.py --model models/deepseek-coder-1.3b-q4.gguf --port 8080
 ### Main PC Setup
 ```bash
 # 1. Clone the AutoCoder repository
-git clone https://github.com/fr4iser90/LLM-NanoJetson-Framework
-cd LLM-NanoJetson-Framework
+git clone https://github.com/fr4iser90/LLM-NanoJetson-Framework2
+cd LLM-NanoJetson-Framework2
 
 # 2. Enter development environment
 nix-shell
