@@ -7,6 +7,9 @@ from ..context.context_manager import ContextManager
 import aiohttp
 import json
 
+# Logger initialisieren
+logger = logging.getLogger(__name__)
+
 @dataclass
 class ProjectPlan:
     components: List[str]
@@ -19,7 +22,7 @@ class PlannerAgent:
     def __init__(self, llm_server_url: str, context_manager: ContextManager):
         self.llm_server_url = llm_server_url
         self.context_manager = context_manager
-        self.logger = logging.getLogger(__name__)
+        logger.info(f"Initialized PlannerAgent with LLM server at: {llm_server_url}")
 
     async def create_project_plan(self, project_description: str) -> ProjectPlan:
         """Create a comprehensive project plan based on the description."""
@@ -87,7 +90,7 @@ Format the response as JSON with the following structure:
                 estimated_timeline=data["estimated_timeline"]
             )
         except Exception as e:
-            self.logger.error(f"Error parsing plan response: {str(e)}")
+            logger.error(f"Error parsing plan response: {str(e)}")
             raise
 
     def _create_planning_tasks(self, plan: ProjectPlan) -> List[Dict]:
@@ -134,19 +137,28 @@ Format the response as JSON with the following structure:
             for component in plan.components
         ]
 
-    async def _query_llm(self, prompt: str, context: List[Dict] = None) -> str:
-        """Send query to LLM server and get response."""
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{self.llm_server_url}/generate",
-                json={
-                    "prompt": prompt,
-                    "context_chunks": context,
-                    "max_tokens": 2048,
-                    "temperature": 0.7
-                }
-            ) as response:
-                if response.status != 200:
-                    raise Exception(f"LLM query failed: {await response.text()}")
-                result = await response.json()
-                return result["generated_code"] 
+    async def _query_llm(self, prompt: str, context: Optional[str] = None) -> str:
+        """Query the LLM server with the given prompt."""
+        try:
+            logger.info(f"Querying LLM at {self.llm_server_url}")
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.llm_server_url}/generate",
+                    json={
+                        "prompt": prompt,
+                        "max_tokens": 1024,
+                        "temperature": 0.7,
+                        "context_chunks": [{"content": context}] if context else None
+                    }
+                ) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        logger.error(f"LLM request failed with status {response.status}: {error_text}")
+                        raise Exception(f"LLM query failed: {error_text}")
+                        
+                    result = await response.json()
+                    return result["generated_code"]
+                        
+        except Exception as e:
+            logger.error(f"Error querying LLM: {str(e)}")
+            raise 

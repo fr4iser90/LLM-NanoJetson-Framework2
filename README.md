@@ -579,3 +579,60 @@ docker run --runtime nvidia -it --rm --network host \
   -v ~/projects:/workspace/projects \
   autocoder/jetson:latest
 ```
+
+# LLM-NanoJetson-Framework2
+
+Ein verteiltes System für KI-gestützte Code-Generierung mit einem Jetson Nano als LLM-Server.
+
+## Architektur
+
+Das System besteht aus drei Hauptkomponenten:
+
+1. **LLM-Server** (läuft auf Jetson Nano)
+   - Hostet das KI-Modell (deepseek-coder-1.3b)
+   - Nutzt die Jetson GPU für Inferenz
+   - Port: 8888
+
+2. **Orchestrator** (läuft auf dem Haupt-PC)
+   - Koordiniert den gesamten Entwicklungsprozess
+   - Kommuniziert mit dem LLM-Server
+   - Verwaltet Tasks und Projektfortschritt
+   - Port: 9999
+
+3. **Frontend** (läuft auf dem Haupt-PC)
+   - React-basierte Benutzeroberfläche
+   - Kommuniziert mit dem Orchestrator
+   - Port: 3333
+
+## Deployment
+
+### Auf dem Jetson Nano:
+```bash
+# Nur den LLM-Server starten
+docker-compose up llm-server
+```
+
+### Auf dem Haupt-PC:
+```bash
+# Orchestrator und Frontend starten
+docker-compose up orchestrator frontend
+```
+
+## Konfiguration
+
+Die `docker-compose.yml` definiert die Verbindungen:
+
+```yaml
+services:
+  llm-server:      # Läuft auf Jetson Nano
+    ports: 8888:8080
+    runtime: nvidia # Nutzt Jetson GPU
+
+  orchestrator:     # Läuft auf Haupt-PC
+    environment:
+      - LLM_SERVER_URL=http://192.168.178.36:8888  # IP des Jetson
+
+  frontend:        # Läuft auf Haupt-PC
+    environment:
+      - REACT_APP_API_URL=http://localhost:9999     # Orchestrator
+```

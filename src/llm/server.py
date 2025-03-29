@@ -31,7 +31,7 @@ class LLMServer:
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_path,
-            torch_dtype=torch.float16,
+            torch_dtype=torch.float32,
             low_cpu_mem_usage=True,
             device_map="auto"
         )
