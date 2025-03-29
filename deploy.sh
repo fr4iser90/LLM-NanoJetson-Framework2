@@ -72,19 +72,21 @@ setup_docker() {
 
 # Main deployment logic
 main() {
-    # Check for required commands
+    # Check for docker first, as it's needed everywhere
     check_command docker || exit 1
-    check_command docker-compose || exit 1
 
     # Check if we're on Jetson Nano
     if [ -f /etc/nv_tegra_release ]; then
         echo -e "${GREEN}Detected Jetson Nano platform${NC}"
         
-        # Initialize Jetson specific settings
+        # Initialize Jetson specific settings (includes docker-compose install)
         initialize_jetson
         
         # Setup Docker
         setup_docker
+        
+        # NOW check for docker-compose after attempting installation
+        check_command docker-compose || exit 1
         
         echo -e "${GREEN}Starting LLM Server on Jetson Nano...${NC}"
         # Build and start LLM server
@@ -95,6 +97,9 @@ main() {
         
     else
         echo -e "${GREEN}Deploying Orchestrator and Frontend on Main PC...${NC}"
+        
+        # Check for docker-compose on Main PC
+        check_command docker-compose || exit 1
         
         # Create necessary directories
         mkdir -p models cache projects
