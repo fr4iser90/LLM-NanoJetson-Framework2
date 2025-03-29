@@ -1,0 +1,8 @@
+main_pc:
+  host: "192.168.1.xxx"  # Deine PC IP-Adresse
+  api_port: 8000
+  ui_port: 3000
+
+jetson:
+  host: "192.168.1.yyy"  # Deine Jetson IP-Adresse
+  llm_port: 8080 

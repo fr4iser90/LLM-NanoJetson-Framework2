@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # LLM Service auf dem Jetson Nano
+  llm-server:
+    build:
+      context: .
+      dockerfile: docker/llm-server.Dockerfile
+    runtime: nvidia  # Für GPU-Zugriff
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - MODEL_PATH=deepseek-ai/deepseek-coder-1.3b-base
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/app/models
+      - ./cache:/app/cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Hauptserver mit Orchestrierung
+  orchestrator:
+    build:
+      context: .
+      dockerfile: docker/orchestrator.Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./projects:/app/projects
+    environment:
+      - LLM_SERVER_URL=http://llm-server:8080
+    depends_on:
+      - llm-server
+
+  # Frontend
+  frontend:
+    build:
+      context: ./src/ui/frontend
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src/ui/frontend:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    depends_on:
+      - orchestrator 
