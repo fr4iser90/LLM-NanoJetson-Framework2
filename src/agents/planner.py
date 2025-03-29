@@ -4,6 +4,8 @@ from pathlib import Path
 import logging
 from ..orchestration.task_manager import TaskType, Task
 from ..context.context_manager import ContextManager
+import aiohttp
+import json
 
 @dataclass
 class ProjectPlan:

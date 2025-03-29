@@ -3,21 +3,33 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 import asyncio
+import aiohttp
 import logging
+import yaml
+from pathlib import Path
 from ..agents.planner import PlannerAgent
 from ..agents.developer import DeveloperAgent
 from ..agents.tester import TestingAgent
 from ..orchestration.task_manager import TaskManager
 from ..context.context_manager import ContextManager
 from ..templates.template_manager import TemplateManager
+import os
+import json
+
+# Konfiguration direkt laden
+config_path = Path("/app/config/config.yml")  # Direkt den gemounteten Pfad verwenden
+with open(config_path) as f:
+    config = yaml.safe_load(f)
 
 app = FastAPI(title="AutoCoder UI API")
 logger = logging.getLogger(__name__)
 
-# Enable CORS
+# CORS konfigurieren
+origins = json.loads(os.getenv('CORS_ORIGINS', '["http://localhost:3333"]'))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with actual frontend origin
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,48 +57,73 @@ class ProjectStatus(BaseModel):
     current_file: Optional[str] = None
     progress: float
 
+# Get configuration from config.yml
+MAIN_PC_HOST = config['main_pc']['host']
+MAIN_PC_API_PORT = config['main_pc']['api_port']
+JETSON_HOST = config['jetson']['host']
+JETSON_LLM_PORT = config['jetson']['llm_port']
+
+# Use configuration
+LLM_SERVER_URL = f"http://{JETSON_HOST}:{JETSON_LLM_PORT}"
+
 # Initialize components
 context_manager = ContextManager()
 template_manager = TemplateManager(Path("templates"))
 task_manager = TaskManager()
 
 # Initialize agents
-planner_agent = PlannerAgent("http://localhost:8080", context_manager)
-developer_agent = DeveloperAgent("http://localhost:8080", context_manager, template_manager)
-testing_agent = TestingAgent("http://localhost:8080", context_manager)
+planner_agent = PlannerAgent(LLM_SERVER_URL, context_manager)
+developer_agent = DeveloperAgent(LLM_SERVER_URL, context_manager, template_manager)
+testing_agent = TestingAgent(LLM_SERVER_URL, context_manager)
+
+@app.get("/")
+async def root():
+    """Root endpoint that returns API information."""
+    return {
+        "name": "AutoCoder API",
+        "version": "1.0.0",
+        "endpoints": [
+            "/projects",
+            "/projects/{project_name}/status",
+            "/ws/projects/{project_name}/events"
+        ]
+    }
 
 @app.post("/projects", response_model=ProjectStatus)
 async def create_project(request: ProjectRequest):
     """Create a new project and start the development process."""
     try:
-        # Create project plan
-        plan = await planner_agent.create_project_plan(request.description)
-        
-        # Convert plan to tasks
-        tasks = await planner_agent.decompose_into_tasks(plan)
-        
-        # Register tasks with task manager
-        task_ids = []
-        for task in tasks:
-            task_id = task_manager.create_task(
-                type=task["type"],
-                description=task["description"],
-                dependencies=task.get("dependencies", [])
+        # Erstelle eine neue aiohttp Session für jeden Request
+        async with aiohttp.ClientSession() as session:
+            # Create project plan
+            plan = await planner_agent.create_project_plan(request.description)
+            
+            # Convert plan to tasks
+            tasks = await planner_agent.decompose_into_tasks(plan)
+            
+            # Register tasks with task manager
+            task_ids = []
+            for task in tasks:
+                task_id = task_manager.create_task(
+                    type=task["type"],
+                    description=task["description"],
+                    dependencies=task.get("dependencies", [])
+                )
+                task_ids.append(task_id)
+            
+            # Start task execution in background
+            asyncio.create_task(task_manager.execute_all())
+            
+            return ProjectStatus(
+                name=request.name,
+                status="started",
+                tasks=[],
+                progress=0.0
             )
-            task_ids.append(task_id)
-        
-        # Start task execution
-        asyncio.create_task(task_manager.execute_all())
-        
-        return ProjectStatus(
-            name=request.name,
-            status="started",
-            tasks=[],
-            progress=0.0
-        )
-        
+            
     except Exception as e:
         logger.error(f"Error creating project: {str(e)}")
+        logger.exception(e)  # Log full traceback
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/projects/{project_name}/status", response_model=ProjectStatus)

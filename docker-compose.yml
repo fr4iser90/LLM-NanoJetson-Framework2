@@ -6,6 +6,7 @@ services:
     build:
       context: .
       dockerfile: docker/llm-server.Dockerfile
+    container_name: llm-server
     runtime: nvidia  # Für GPU-Zugriff
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
@@ -15,6 +16,7 @@ services:
     volumes:
       - ./models:/app/models
       - ./cache:/app/cache
+      - ./config:/app/config
     deploy:
       resources:
         reservations:
@@ -28,27 +30,40 @@ services:
     build:
       context: .
       dockerfile: docker/orchestrator.Dockerfile
+    container_name: llm-orchestrator
     ports:
       - "9999:8000"
     volumes:
       - ./src:/app/src
       - ./projects:/app/projects
+      - ./config:/app/config
     environment:
-      - LLM_SERVER_URL=http://llm-server:8888
-    depends_on:
-      - llm-server
+      - LLM_SERVER_URL=http://192.168.178.36:8888
+      - CORS_ORIGINS=["http://localhost:3333"]  # Array von erlaubten Origins
+    networks:
+      - app-network
 
   # Frontend
   frontend:
     build:
-      context: ./src/ui/frontend
+      context: .
       dockerfile: docker/frontend.Dockerfile
+    container_name: llm-frontend
     ports:
       - "3333:3000"
     volumes:
       - ./src/ui/frontend:/app
       - /app/node_modules
+      - ./config:/app/config
     environment:
       - REACT_APP_API_URL=http://localhost:9999
+      - REACT_APP_WS_URL=ws://localhost:9999
+      - PORT=3000
     depends_on:
-      - orchestrator 
+      - orchestrator
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge 

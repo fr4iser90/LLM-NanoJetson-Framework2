@@ -43,34 +43,36 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
 
-  // WebSocket connection for real-time updates
+  // URLs für Browser-Zugriff
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:9999';
+  const WS_URL = process.env.REACT_APP_WS_URL || 'ws://localhost:9999';
+
   useEffect(() => {
     if (status?.name) {
-      const ws = new WebSocket(`ws://localhost:8000/ws/projects/${status.name}/events`);
+      console.log('Connecting to WebSocket:', `${WS_URL}/ws/projects/${status.name}/events`);
+      const ws = new WebSocket(`${WS_URL}/ws/projects/${status.name}/events`);
+      
+      ws.onopen = () => console.log('WebSocket connected');
+      ws.onclose = () => console.log('WebSocket closed');
+      ws.onerror = (error) => console.error('WebSocket error:', error);
       
       ws.onmessage = (event) => {
         const newStatus = JSON.parse(event.data);
         setStatus(newStatus);
       };
 
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        toast({
-          title: 'Connection Error',
-          description: 'Lost connection to server',
-          status: 'error',
-          duration: 5000,
-        });
+      return () => {
+        console.log('Closing WebSocket');
+        ws.close();
       };
-
-      return () => ws.close();
     }
-  }, [status?.name]);
+  }, [status?.name, WS_URL]);
 
   const createProject = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:8000/projects', {
+      // Nutze die konfigurierte API URL
+      const response = await fetch(`${API_URL}/projects`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -94,10 +96,10 @@ function App() {
         status: 'success',
         duration: 5000,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
         status: 'error',
         duration: 5000,
       });

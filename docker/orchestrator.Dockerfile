@@ -15,5 +15,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
 COPY src /app/src
+COPY config /app/config
 
 CMD ["python", "-m", "src.ui.api"] 
